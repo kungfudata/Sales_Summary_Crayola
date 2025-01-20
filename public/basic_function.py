@@ -532,6 +532,7 @@ class EmailSender:
         msg['From'] = formataddr(["Pengyue", sender])
         print(email_list, type(email_list))
         msg['To'] = ', '.join(email_list)
+        msg['Cc'] = 'techreports@kungfudata.com'
         msg['Subject'] = Header(f'{store_name} Sales Performance', 'utf-8')
 
         # 正文部分
