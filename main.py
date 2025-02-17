@@ -129,7 +129,7 @@ def sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, trade_type
 
 def inventory_summary(db_baidu, warehouse_name, inventory_table, stock_out_detail, start_date_week, end_date):
     sql2 = f'''
-                SELECT
+        SELECT
             IFNULL(inv.class_name, '汇总') AS class_name,
             inv.total_stock_num,
             inv.total_cost,
@@ -138,7 +138,10 @@ def inventory_summary(db_baidu, warehouse_name, inventory_table, stock_out_detai
         FROM
             (
                 SELECT
-                    IFNULL(p.class_name, '汇总') AS class_name,
+                    CASE 
+                        WHEN GROUPING(p.class_name) = 1 THEN '汇总'
+                        ELSE IFNULL(p.class_name, '未知分类')
+                    END AS class_name,
                     SUM(i.stock_num) AS total_stock_num,
                     ROUND(SUM(i.stock_num * i.cost_price), 2) AS total_cost
                 FROM
@@ -155,7 +158,10 @@ def inventory_summary(db_baidu, warehouse_name, inventory_table, stock_out_detai
         LEFT JOIN
             (
                 SELECT
-                    IFNULL(p.class_name, '汇总') AS class_name,
+                    CASE 
+                        WHEN GROUPING(p.class_name) = 1 THEN '汇总'
+                        ELSE IFNULL(p.class_name, '未知分类')
+                    END AS class_name,
                     ROUND(SUM(s.detail_total_amount), 2) AS total_amount,
                     ROUND(SUM(s.detail_goods_count), 2) AS total_count
                 FROM
@@ -164,13 +170,16 @@ def inventory_summary(db_baidu, warehouse_name, inventory_table, stock_out_detai
                     WDT_integration.WDT_Products p
                 ON
                     s.detail_spec_no = p.spec_no
-                WHERE (DATE(s.consign_time) BETWEEN {start_date_week} AND {end_date}) AND s.status_CN IN ('已完成','已发货')
+                WHERE 
+                    (DATE(s.consign_time) BETWEEN {start_date_week} AND {end_date}) 
+                    AND s.status_CN IN ('已完成','已发货')
                 GROUP BY
                     p.class_name WITH ROLLUP
             ) sale
         ON
-            IFNULL(inv.class_name, '汇总') = IFNULL(sale.class_name, '汇总')
-        ORDER BY total_stock_num
+            inv.class_name = sale.class_name
+        ORDER BY 
+            inv.total_stock_num
         '''
     print(sql2)
     db_baidu.execute_query(sql2,)
@@ -185,20 +194,37 @@ def sales_detail(db_baidu, sales_detail, trade_type_name, start_date, end_date, 
                 p.goods_name,
                 SUM(s.detail_goods_count) AS total_count,
                 ROUND(SUM(s.detail_total_amount), 2) AS total_amount,
-                ROUND(SUM(s.detail_goods_count * i.cost_price), 2) AS total_cost_price,
-                SUM(i.stock_num) AS total_stock_count
-                FROM
+                ROUND(SUM(s.detail_goods_count * COALESCE(i.cost_price, 0)), 2) AS total_cost_price,
+                COALESCE(i.total_stock_count, 0) AS total_stock_count
+            FROM
                 {sales_detail} s
-                LEFT JOIN
-                WDT_Inventory_management i
-                ON
-                s.detail_spec_no = i.spec_no
-                LEFT JOIN
+            LEFT JOIN 
+                (
+                    -- 先按 spec_no 进行汇总，确保每个 spec_no 只取唯一记录
+                    SELECT 
+                        spec_no, 
+                        MAX(cost_price) AS cost_price,  -- 选取最大成本价（或者可以用 AVG(cost_price)）
+                        SUM(stock_num) AS total_stock_count  -- 按 spec_no 聚合库存
+                    FROM 
+                        WDT_Inventory_management
+                    WHERE 
+                        warehouse_name IN ({', '.join([f"'{name}'" for name in warehouse_name])})  -- 只取指定仓库
+                    GROUP BY 
+                        spec_no
+                ) i
+            ON s.detail_spec_no = i.spec_no
+            LEFT JOIN
                 WDT_integration.WDT_Products p
-                ON i.spec_no = p.spec_no
-                WHERE s.trade_type_name in ({', '.join([f"'{name}'" for name in trade_type_name])}) AND(DATE(s.consign_time) BETWEEN '{start_date}' AND '{end_date}')  AND s.status_CN IN ('已完成','已发货') AND i.warehouse_name IN ({', '.join([f"'{name}'" for name in warehouse_name])})
-                GROUP BY s.detail_spec_no
-                ORDER BY total_amount DESC'''
+            ON s.detail_spec_no = p.spec_no
+            WHERE 
+                s.trade_type_name IN ({', '.join([f"'{name}'" for name in trade_type_name])}) 
+                AND (DATE(s.consign_time) BETWEEN '{start_date}' AND '{end_date}')  
+                AND s.status_CN IN ('已完成', '已发货')
+            GROUP BY 
+                s.detail_spec_no, p.goods_name, i.total_stock_count, i.cost_price
+            ORDER BY 
+                total_amount DESC;
+            '''
     print(sql1)
     db_baidu.execute_query(sql1,)
     sales_detail_table = db_baidu.fetchall()
@@ -316,7 +342,7 @@ if __name__ == '__main__':
 
     # print(datetime.date.today() - timedelta(7))
 
-    end_date = (datetime.date.today() - timedelta(1))
+    end_date = (datetime.date.today() - timedelta(0))
     start_date_month = (end_date - timedelta(30))
     start_date_week = (end_date - timedelta(7))
     end_date = end_date.strftime("%Y%m%d")
@@ -328,8 +354,8 @@ if __name__ == '__main__':
     file_root = '/root/scripts/Sales_Summary_Crayola'
     # file_root = 'C:/Users/11837/Desktop/test'
     file_path = file_root + '/' + f'{start_date_week}-{end_date} Sales performance of Crayola .xlsx'
-    # email_List = ['leo@kungfudata.com','alice@kungfudata.com', 'michelle@kungfudata.com', 'wendy@kungfudata.com', 'pengyue@kungfudata.com']
-    email_List = ['pengyue@kungfudata.com']
+    email_List = ['leo@kungfudata.com','alice@kungfudata.com', 'michelle@kungfudata.com', 'wendy@kungfudata.com', 'pengyue@kungfudata.com']
+    # email_List = ['pengyue@kungfudata.com']
     warehouse_name = ['绘儿乐扬州趣云良品仓', '绘儿乐ELEE上海仓1']
     sales_columns = ['销售类型', '出库件数', '销售金额', '成本价', '成本价/销售金额', '利润']
     change_columns = ['销售类型', '出库件数', '销售金额', '成本价', '利润']

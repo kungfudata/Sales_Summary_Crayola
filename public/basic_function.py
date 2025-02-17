@@ -19,7 +19,7 @@ import hashlib
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
-warehouse_no_List = ['crayola-2']
+warehouse_no_List = ['crayola-2', 'crayola-3-1']
 
 
 class DataBase_baidu:
