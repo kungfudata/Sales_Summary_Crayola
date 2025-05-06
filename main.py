@@ -45,7 +45,7 @@ def sales_summay(db_baidu, stock_out_detail, start_date, end_date, warehouse_nam
     '''
     print(1111, sql1)
     # 执行查询
-    db_baidu.execute_query(sql1,)
+    db_baidu.execute_query(sql1, )
     sales_summay_table = db_baidu.fetchall()
 
     return sales_summay_table
@@ -79,7 +79,7 @@ def sales_summay_online(db_baidu, stock_out_detail, warehouse_name, trade_type_n
 
     '''
     print(222, sql1)
-    db_baidu.execute_query(sql1,)
+    db_baidu.execute_query(sql1, )
     sales_summay_online_table = db_baidu.fetchall()
     # db_baidu.close()
     return sales_summay_online_table
@@ -182,7 +182,7 @@ def inventory_summary(db_baidu, warehouse_name, inventory_table, stock_out_detai
             inv.total_stock_num
         '''
     print(sql2)
-    db_baidu.execute_query(sql2,)
+    db_baidu.execute_query(sql2, )
     inventory_summary_table = db_baidu.fetchall()
     # db_baidu.close()
     return inventory_summary_table
@@ -226,7 +226,7 @@ def sales_detail(db_baidu, sales_detail, trade_type_name, start_date, end_date, 
                 total_amount DESC;
             '''
     print(sql1)
-    db_baidu.execute_query(sql1,)
+    db_baidu.execute_query(sql1, )
     sales_detail_table = db_baidu.fetchall()
 
     return sales_detail_table
@@ -294,7 +294,7 @@ def store_classify(store_name):
     mapping_unit = {
         'Crayola绘儿乐文具旗舰店-抖音': '绘儿乐-抖音',
         'Crayola绘儿乐旗舰店-京东': '绘儿乐-京东',
-        '绘儿乐官方旗舰店': '绘儿乐-天猫',
+        'Crayola绘儿乐玩具旗舰店-天猫': '绘儿乐-天猫',
         '绘儿乐旗舰店-拼多多': '绘儿乐-拼多多',
         'Crayola绘儿乐-1688': '绘儿乐-阿里巴巴'
     }
@@ -324,6 +324,7 @@ def format_number(x):
 def summary_all(purchasein_detail_table, columns):
     cols_to_convert = [col for col in purchasein_detail_table.columns if col not in ['商家编码', '货品名称']]
     purchasein_detail_table[cols_to_convert] = purchasein_detail_table[cols_to_convert].apply(pd.to_numeric, errors='coerce')
+    print("列名为：", purchasein_detail_table.columns.tolist())
     col_sum = purchasein_detail_table.drop(columns=['商家编码', '货品名称']).sum()
     # 创建汇总行，并插入到第一行
     summary_row = pd.Series(['汇总', '汇总'] + col_sum.tolist(), index=purchasein_detail_table.columns)
@@ -333,107 +334,109 @@ def summary_all(purchasein_detail_table, columns):
 
 
 if __name__ == '__main__':
-    # try:
-    db_baidu = basic_function.DataBase_baidu()
-    stock_out_detail = 'Crayola_WDT_sales_stock_out_detail'
-    stock_out_table = 'Crayola_WDT_sales_stock_out'
-    inventory_table = 'WDT_Inventory_management'
-    purchase_table = 'Crayola_WDT_purchase_stock_in'
+    try:
+        db_baidu = basic_function.DataBase_baidu()
+        stock_out_detail = 'Crayola_WDT_sales_stock_out_detail'
+        stock_out_table = 'Crayola_WDT_sales_stock_out'
+        inventory_table = 'WDT_Inventory_management'
+        purchase_table = 'Crayola_WDT_purchase_stock_in'
 
-    # print(datetime.date.today() - timedelta(7))
+        # print(datetime.date.today() - timedelta(7))
+        end_date = (datetime.date.today() - timedelta(0))
+        start_date_month = (end_date - timedelta(30))
+        start_date_week = (end_date - timedelta(7))
+        end_date = end_date.strftime("%Y%m%d")
+        start_date_month = start_date_month.strftime("%Y%m%d")
+        start_date_week = start_date_week.strftime("%Y%m%d")
+        print(f'---------------{start_date_week}-{end_date}-----------------')
 
-    end_date = (datetime.date.today() - timedelta(0))
-    start_date_month = (end_date - timedelta(30))
-    start_date_week = (end_date - timedelta(7))
-    end_date = end_date.strftime("%Y%m%d")
-    start_date_month = start_date_month.strftime("%Y%m%d")
-    start_date_week = start_date_week.strftime("%Y%m%d")
-    print(f'---------------{start_date_week}-{end_date}-----------------')
+        store_name = 'Crayola'
+        file_root = '/root/scripts/Sales_Summary_Crayola'
+        # file_root = 'C:/Users/11837/Desktop/test'
+        file_path = file_root + '/' + f'{start_date_week}-{end_date} Sales performance of Crayola .xlsx'
+        email_List = ['leo@kungfudata.com', 'alice@kungfudata.com', 'michelle@kungfudata.com', 'wendy@kungfudata.com', 'shawn@kungfudata.com', 'pengyue@kungfudata.com']
+        # email_List = ['pengyue@kungfudata.com']
+        warehouse_name = ['绘儿乐扬州趣云良品仓', '绘儿乐ELEE上海仓1','绘儿乐ELEE上海赠品仓']
+        sales_columns = ['销售类型', '出库件数', '销售金额', '成本价', '成本价/销售金额', '利润']
+        change_columns = ['销售类型', '出库件数', '销售金额', '成本价', '利润']
+        # # 线上线下汇总
+        sales_summay_table = sales_summay(db_baidu, stock_out_detail, start_date_week, end_date, warehouse_name)
+        sales_summay_table = To_DF(sales_summay_table, sales_columns)
+        sales_summay_table[change_columns] = sales_summay_table[change_columns].applymap(format_number)
 
-    store_name = 'Crayola'
-    file_root = '/root/scripts/Sales_Summary_Crayola'
-    # file_root = 'C:/Users/11837/Desktop/test'
-    file_path = file_root + '/' + f'{start_date_week}-{end_date} Sales performance of Crayola .xlsx'
-    email_List = ['leo@kungfudata.com','alice@kungfudata.com', 'michelle@kungfudata.com', 'wendy@kungfudata.com', 'pengyue@kungfudata.com']
-    # email_List = ['pengyue@kungfudata.com']
-    warehouse_name = ['绘儿乐扬州趣云良品仓', '绘儿乐ELEE上海仓1']
-    sales_columns = ['销售类型', '出库件数', '销售金额', '成本价', '成本价/销售金额', '利润']
-    change_columns = ['销售类型', '出库件数', '销售金额', '成本价', '利润']
-    # # 线上线下汇总
-    sales_summay_table = sales_summay(db_baidu, stock_out_detail, start_date_week, end_date, warehouse_name)
-    sales_summay_table = To_DF(sales_summay_table, sales_columns)
-    sales_summay_table[change_columns] = sales_summay_table[change_columns].applymap(format_number)
+        sales_summay_online_table = sales_summay_online(db_baidu, stock_out_detail, warehouse_name, ('网店销售', '线下零售', '订单补发'), start_date_week, end_date)
+        sales_summay_online_table = To_DF(sales_summay_online_table, sales_columns)
+        sales_summay_online_table[change_columns] = sales_summay_online_table[change_columns].applymap(format_number)
+        sales_summay_online_table['销售类型'] = sales_summay_online_table['销售类型'].apply(lambda x: store_classify(x))
 
-    sales_summay_online_table = sales_summay_online(db_baidu, stock_out_detail, warehouse_name, ('网店销售', '线下零售', '订单补发'), start_date_week, end_date)
-    sales_summay_online_table = To_DF(sales_summay_online_table, sales_columns)
-    sales_summay_online_table[change_columns] = sales_summay_online_table[change_columns].applymap(format_number)
-    sales_summay_online_table['销售类型'] = sales_summay_online_table['销售类型'].apply(lambda x: store_classify(x))
+        sales_summay_offline_table = sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, ('批发业务', ''), start_date_week, end_date)
+        sales_summay_offline_table = To_DF(sales_summay_offline_table, sales_columns)
+        sales_summay_offline_table[change_columns] = sales_summay_offline_table[change_columns].applymap(format_number)
 
-    sales_summay_offline_table = sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, ('批发业务', ''), start_date_week, end_date)
-    sales_summay_offline_table = To_DF(sales_summay_offline_table, sales_columns)
-    sales_summay_offline_table[change_columns] = sales_summay_offline_table[change_columns].applymap(format_number)
+        # 库存情况
+        inventory_summary_table = inventory_summary(db_baidu, warehouse_name, inventory_table, stock_out_detail, start_date_week, end_date)
+        inventory_summary_table = To_DF(inventory_summary_table, columns=['分类', '库存件数', '成本金额(RMB)', '出库件数', '销售金额']).applymap(format_number)
+        # print(pd.DataFrame(inventory_summary_table, columns=['分类', '库存量(件)', '成本金额(RMB)']))
+        #
+        # # 初始化ExcelSaver对象
+        excel_saver = basic_function.ExcelSaver(file_path)  # TODO 放在服务器上要改
+        excel_saver.delete_crayola_files(file_root)
+        #
+        # 以下是销售详情 线上销售情况、线下销售情况
+        sales_online_detail_table = sales_detail(db_baidu, stock_out_detail, ('网店销售', '线下零售'), start_date_week, end_date, warehouse_name)
+        sales_online_detail_table = To_DF(sales_online_detail_table, ['商家编码', '货品名称', '出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
+        sales_online_detail_table = summary_all(pd.DataFrame(sales_online_detail_table), ['出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
 
-    # 库存情况
-    inventory_summary_table = inventory_summary(db_baidu, warehouse_name, inventory_table, stock_out_detail, start_date_week, end_date)
-    inventory_summary_table = To_DF(inventory_summary_table, columns=['分类', '库存件数', '成本金额(RMB)', '出库件数', '销售金额']).applymap(format_number)
-    # print(pd.DataFrame(inventory_summary_table, columns=['分类', '库存量(件)', '成本金额(RMB)']))
-    #
-    # # 初始化ExcelSaver对象
-    excel_saver = basic_function.ExcelSaver(file_path)  # TODO 放在服务器上要改
-    excel_saver.delete_crayola_files(file_root)
-    #
-    # 以下是销售详情 线上销售情况、线下销售情况
-    sales_online_detail_table = sales_detail(db_baidu, stock_out_detail, ('网店销售', '线下零售'), start_date_week, end_date, warehouse_name)
-    sales_online_detail_table = To_DF(sales_online_detail_table, ['商家编码', '货品名称', '出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
-    sales_online_detail_table = summary_all(pd.DataFrame(sales_online_detail_table), ['出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
+        sales_offline_detail_table = sales_detail(db_baidu, stock_out_detail, ('批发业务', ''), start_date_week, end_date, warehouse_name)
+        sales_offline_detail_table = To_DF(sales_offline_detail_table, ['商家编码', '货品名称', '出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
+        sales_offline_detail_table = summary_all(pd.DataFrame(sales_offline_detail_table), ['出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
 
-    sales_offline_detail_table = sales_detail(db_baidu, stock_out_detail, ('批发业务', ''), start_date_week, end_date, warehouse_name)
-    sales_offline_detail_table = To_DF(sales_offline_detail_table, ['商家编码', '货品名称', '出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
-    sales_offline_detail_table = summary_all(pd.DataFrame(sales_offline_detail_table), ['出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
+        # 采购详情
+        purchasein_detail_table = pd.DataFrame(purchasein_detail(db_baidu, purchase_table, start_date_month, end_date))
+        if purchasein_detail_table is not None and not purchasein_detail_table.empty:
+            purchasein_detail_table = summary_all(pd.DataFrame(purchasein_detail_table), purchasein_detail_table.columns)
 
-    # 采购详情
-    purchasein_detail_table = pd.DataFrame(purchasein_detail(db_baidu, purchase_table, start_date_month, end_date))
-    purchasein_detail_table = summary_all(pd.DataFrame(purchasein_detail_table), purchasein_detail_table.columns)
+        db_baidu.close()
+        # 保存数据框到指定位置
+        excel_saver.save_text(f'{start_date_week}-{end_date} 销售情况总概', sheet_name="Summary", start_row=1, start_col=1)
+        excel_saver.fill_cell_red(sheet_name="Summary", row=1, col=1)
+        # 加粗外边框
+        excel_saver.add_bold_border(sheet_name="Summary", start_row=1, start_col=1, end_row=1 + sales_summay_table.shape[0] + 1, end_col=6)
+        # 贴入数据
+        excel_saver.save_dataframe(sales_summay_table, sheet_name="Summary", start_row=2, start_col=1)  # 从第2行第1列开始
 
-    db_baidu.close()
-    # 保存数据框到指定位置
-    excel_saver.save_text(f'{start_date_week}-{end_date} 销售情况总概', sheet_name="Summary", start_row=1, start_col=1)
-    excel_saver.fill_cell_red(sheet_name="Summary", row=1, col=1)
-    # 加粗外边框
-    excel_saver.add_bold_border(sheet_name="Summary", start_row=1, start_col=1, end_row=1 + sales_summay_table.shape[0] + 1, end_col=6)
-    # 贴入数据
-    excel_saver.save_dataframe(sales_summay_table, sheet_name="Summary", start_row=2, start_col=1)  # 从第2行第1列开始
+        excel_saver.save_text(f'{start_date_week}-{end_date} 线上渠道销售情况', sheet_name="Summary", start_row=9, start_col=1)
+        excel_saver.fill_cell_red(sheet_name="Summary", row=9, col=1)
+        excel_saver.add_bold_border(sheet_name="Summary", start_row=9, start_col=1, end_row=9 + sales_summay_online_table.shape[0] + 1, end_col=6)
+        excel_saver.save_dataframe(sales_summay_online_table, sheet_name="Summary", start_row=10, start_col=1)  # 从第2行第6列开始
 
-    excel_saver.save_text(f'{start_date_week}-{end_date} 线上渠道销售情况', sheet_name="Summary", start_row=9, start_col=1)
-    excel_saver.fill_cell_red(sheet_name="Summary", row=9, col=1)
-    excel_saver.add_bold_border(sheet_name="Summary", start_row=9, start_col=1, end_row=9 + sales_summay_online_table.shape[0] + 1, end_col=6)
-    excel_saver.save_dataframe(sales_summay_online_table, sheet_name="Summary", start_row=10, start_col=1)  # 从第2行第6列开始
+        excel_saver.save_text(f'{start_date_week}-{end_date} 线下渠道销售情况', sheet_name="Summary", start_row=22, start_col=1)
+        excel_saver.fill_cell_red(sheet_name="Summary", row=22, col=1)
+        excel_saver.add_bold_border(sheet_name="Summary", start_row=22, start_col=1, end_row=22 + sales_summay_offline_table.shape[0] + 1, end_col=6)
+        excel_saver.save_dataframe(sales_summay_offline_table, sheet_name="Summary", start_row=23, start_col=1)  # 从第2行第11列开始
 
-    excel_saver.save_text(f'{start_date_week}-{end_date} 线下渠道销售情况', sheet_name="Summary", start_row=22, start_col=1)
-    excel_saver.fill_cell_red(sheet_name="Summary", row=22, col=1)
-    excel_saver.add_bold_border(sheet_name="Summary", start_row=22, start_col=1, end_row=22 + sales_summay_offline_table.shape[0] + 1, end_col=6)
-    excel_saver.save_dataframe(sales_summay_offline_table, sheet_name="Summary", start_row=23, start_col=1)  # 从第2行第11列开始
+        excel_saver.save_text(f'{end_date} 库存情况', sheet_name="Summary", start_row=30, start_col=1)
+        excel_saver.fill_cell_red(sheet_name="Summary", row=30, col=1)
+        excel_saver.add_bold_border(sheet_name="Summary", start_row=30, start_col=1, end_row=30 + inventory_summary_table.shape[0] + 1, end_col=5)
+        excel_saver.save_dataframe(inventory_summary_table, sheet_name="Summary", start_row=31, start_col=1)  # 从第9行第1列开始
+        #
+        #
+        excel_saver.save_dataframe(sales_offline_detail_table, sheet_name="线下销售情况", start_row=1, start_col=1)  # 从第1行第1列开始
+        excel_saver.save_dataframe(sales_online_detail_table, sheet_name="线上销售情况", start_row=1, start_col=1)  # 从第1行第1列开始
+        print(purchasein_detail_table)
+        if purchasein_detail_table is not None and not purchasein_detail_table.empty:
+            excel_saver.save_dataframe(purchasein_detail_table, sheet_name="采购情况(金额)", start_row=1, start_col=1)  # 从第1行第1列开始
+        else:
+            excel_saver.save_text(f"{start_date_month}-{end_date} 近一个月无采购信息", sheet_name="采购情况(金额)", start_row=1, start_col=1)  # 从第1行第1列开始
+        # # # 保存Excel文件
+        print(file_path)
+        excel_saver.save()
+        emailsender = basic_function.EmailSender()
+        print(store_name, file_path, email_List, start_date_week, end_date)
+        emailsender.send_report_to_people(store_name, file_path, email_List, start_date_week, end_date)
 
-    excel_saver.save_text(f'{end_date} 库存情况', sheet_name="Summary", start_row=30, start_col=1)
-    excel_saver.fill_cell_red(sheet_name="Summary", row=30, col=1)
-    excel_saver.add_bold_border(sheet_name="Summary", start_row=30, start_col=1, end_row=30 + inventory_summary_table.shape[0] + 1, end_col=5)
-    excel_saver.save_dataframe(inventory_summary_table, sheet_name="Summary", start_row=31, start_col=1)  # 从第9行第1列开始
-    #
-    #
-    excel_saver.save_dataframe(sales_offline_detail_table, sheet_name="线下销售情况", start_row=1, start_col=1)  # 从第1行第1列开始
-    excel_saver.save_dataframe(sales_online_detail_table, sheet_name="线上销售情况", start_row=1, start_col=1)  # 从第1行第1列开始
-    print(purchasein_detail_table)
-    excel_saver.save_dataframe(purchasein_detail_table, sheet_name="采购情况(金额)", start_row=1, start_col=1)  # 从第1行第1列开始
-
-    # # # 保存Excel文件
-    print(file_path)
-    excel_saver.save()
-    emailsender = basic_function.EmailSender()
-    print(store_name, file_path, email_List, start_date_week, end_date)
-    emailsender.send_report_to_people(store_name, file_path, email_List, start_date_week, end_date)
-
-    # except Exception as e:
-    #     # pass
-    #     mailgunner = basic_function.MailGunner()
-    #     print('报错信息{}'.format(e))
-    #     mailgunner.send_WDT_script_error_alert('gfdz', "crayola_purchase_stock_in.py", str(e))
+    except Exception as e:
+        # pass
+        mailgunner = basic_function.MailGunner()
+        print('报错信息{}'.format(e))
+        mailgunner.send_WDT_script_error_alert('gfdz', "crayola_purchase_stock_in.py", str(e))
