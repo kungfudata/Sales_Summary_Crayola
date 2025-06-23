@@ -136,6 +136,8 @@ def import_into_database(wb_data, table_name_trade_stock_out, table_name_trade_s
                 trade_type_name = '供销补发'
             elif trade_type == '101':
                 trade_type_name = '达人样品'
+            elif trade_type == '102':
+                trade_type_name = '寄样'
             else:
                 trade_type_name = '未知类型'
             subtype = stock_out_single['subtype']
