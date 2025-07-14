@@ -9,18 +9,10 @@ import datetime
 # 销售出库单
 def sales_summay(db_baidu, stock_out_detail, start_date, end_date, warehouse_name):
     sql1 = f'''SELECT
-                    CASE
-                        WHEN GROUPING(
-                            IFNULL(CASE
-                                WHEN TRIM(s.trade_type_name) IN ('线下零售', '订单补发') THEN '网店销售'
-                                ELSE TRIM(s.trade_type_name)
-                            END, '汇总')
-                        ) = 1 THEN '汇总'
-                        ELSE IFNULL(CASE
-                                WHEN TRIM(s.trade_type_name) IN ('线下零售', '订单补发') THEN '网店销售'
-                                ELSE TRIM(s.trade_type_name)
-                            END, '汇总')
-                    END AS trade_type_name,
+                    CASE 
+                        WHEN GROUPING(IFNULL(CASE WHEN s.shop_no != '010' THEN '网店销售' ELSE '批发业务' END, '汇总')) = 1 THEN '汇总'
+                        ELSE IFNULL(CASE WHEN s.shop_no != '010' THEN '网店销售' ELSE '批发业务' END, '汇总')
+                    END AS business_type,
                     SUM(s.detail_goods_count) AS total_goods_count,
                     ROUND(SUM(s.detail_total_amount), 2) AS total_amount,
                     ROUND(SUM(s.detail_goods_count * i.cost_price), 2) AS total_cost_price,
@@ -37,11 +29,8 @@ def sales_summay(db_baidu, stock_out_detail, start_date, end_date, warehouse_nam
                     s.detail_spec_no = i.spec_no
                 WHERE DATE(s.consign_time) BETWEEN '{start_date}' AND '{end_date}' AND s.status_CN IN ('已完成','已发货') AND s.warehouse_name IN ({', '.join([f"'{name}'" for name in warehouse_name])})
                 GROUP BY
-                IFNULL(CASE
-                        WHEN TRIM(s.trade_type_name) IN ('线下零售', '订单补发') THEN '网店销售'
-                        ELSE TRIM(s.trade_type_name)
-                    END, '汇总')
-                WITH ROLLUP;
+                    IFNULL(CASE WHEN s.shop_no != '010' THEN '网店销售' ELSE '批发业务' END, '汇总') WITH ROLLUP
+                order by total_goods_count;
     '''
     print(1111, sql1)
     # 执行查询
@@ -73,6 +62,7 @@ def sales_summay_online(db_baidu, stock_out_detail, warehouse_name, trade_type_n
                 s.detail_spec_no = i.spec_no
             WHERE
                 s.warehouse_name IN ({', '.join([f"'{name}'" for name in warehouse_name])}) and s.trade_type_name IN ({', '.join([f"'{name}'" for name in trade_type_name])}) AND(DATE(s.consign_time) BETWEEN '{start_date}' AND '{end_date}') AND s.status_CN IN ('已完成','已发货')
+                AND s.shop_no NOT IN ('010')
             GROUP BY
                 s.shop_name WITH ROLLUP
             ORDER BY total_goods_count;
@@ -85,7 +75,7 @@ def sales_summay_online(db_baidu, stock_out_detail, warehouse_name, trade_type_n
     return sales_summay_online_table
 
 
-def sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, trade_type_name, start_date, end_date):
+def sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, start_date, end_date):
     sql1 = f'''SELECT  
                 CASE 
                     WHEN NOT GROUPING(CASE 
@@ -113,7 +103,8 @@ def sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, trade_type
                 GROUP BY spec_no
             ) i ON d.detail_spec_no = i.spec_no
             WHERE 
-                d.trade_type_name in {trade_type_name} AND(DATE(d.consign_time) BETWEEN '{start_date}' AND '{end_date}') AND d.status_CN IN ('已完成','已发货')
+                (DATE(d.consign_time) BETWEEN '{start_date}' AND '{end_date}') AND d.status_CN IN ('已完成','已发货')
+                AND d.shop_no IN ('010')
             GROUP BY 
                 CASE 
                     WHEN notd.cs_remark LIKE '%绘画乐%' THEN '线下-绘画乐' 
@@ -217,7 +208,7 @@ def sales_detail(db_baidu, sales_detail, trade_type_name, start_date, end_date, 
                 WDT_integration.WDT_Products p
             ON s.detail_spec_no = p.spec_no
             WHERE 
-                s.trade_type_name IN ({', '.join([f"'{name}'" for name in trade_type_name])}) 
+                s.shop_no IN ({', '.join([f"'{name}'" for name in trade_type_name])}) 
                 AND (DATE(s.consign_time) BETWEEN '{start_date}' AND '{end_date}')  
                 AND s.status_CN IN ('已完成', '已发货')
             GROUP BY 
@@ -225,7 +216,7 @@ def sales_detail(db_baidu, sales_detail, trade_type_name, start_date, end_date, 
             ORDER BY 
                 total_amount DESC;
             '''
-    print(sql1)
+    print('1111111111111', sql1)
     db_baidu.execute_query(sql1, )
     sales_detail_table = db_baidu.fetchall()
 
@@ -294,9 +285,10 @@ def store_classify(store_name):
     mapping_unit = {
         'Crayola绘儿乐文具旗舰店-抖音': '绘儿乐-抖音',
         'Crayola绘儿乐旗舰店-京东': '绘儿乐-京东',
-        'Crayola绘儿乐玩具旗舰店-天猫': '绘儿乐-天猫',
+        'Crayola绘儿乐旗舰店-天猫': '绘儿乐-天猫',
         '绘儿乐旗舰店-拼多多': '绘儿乐-拼多多',
-        'Crayola绘儿乐-1688': '绘儿乐-阿里巴巴'
+        'Crayola绘儿乐-1688': '绘儿乐-阿里巴巴',
+        '绘儿乐京东自营': '绘儿乐-京东自营'
     }
     store_name_new = mapping_unit.get(store_name, store_name)
     return store_name_new
@@ -356,7 +348,7 @@ if __name__ == '__main__':
         file_path = file_root + '/' + f'{start_date_week}-{end_date} Sales performance of Crayola .xlsx'
         email_List = ['leo@kungfudata.com', 'alice@kungfudata.com', 'michelle@kungfudata.com', 'wendy@kungfudata.com', 'shawn@kungfudata.com', 'pengyue@kungfudata.com']
         # email_List = ['pengyue@kungfudata.com']
-        warehouse_name = ['绘儿乐扬州趣云良品仓', '绘儿乐ELEE上海仓1','绘儿乐ELEE上海赠品仓']
+        warehouse_name = ['绘儿乐扬州趣云良品仓', '绘儿乐ELEE上海仓1', '绘儿乐ELEE上海赠品仓']
         sales_columns = ['销售类型', '出库件数', '销售金额', '成本价', '成本价/销售金额', '利润']
         change_columns = ['销售类型', '出库件数', '销售金额', '成本价', '利润']
         # # 线上线下汇总
@@ -364,12 +356,12 @@ if __name__ == '__main__':
         sales_summay_table = To_DF(sales_summay_table, sales_columns)
         sales_summay_table[change_columns] = sales_summay_table[change_columns].applymap(format_number)
 
-        sales_summay_online_table = sales_summay_online(db_baidu, stock_out_detail, warehouse_name, ('网店销售', '线下零售', '订单补发'), start_date_week, end_date)
+        sales_summay_online_table = sales_summay_online(db_baidu, stock_out_detail, warehouse_name, ('网店销售', '线下零售', '订单补发', '批发业务'), start_date_week, end_date)
         sales_summay_online_table = To_DF(sales_summay_online_table, sales_columns)
         sales_summay_online_table[change_columns] = sales_summay_online_table[change_columns].applymap(format_number)
         sales_summay_online_table['销售类型'] = sales_summay_online_table['销售类型'].apply(lambda x: store_classify(x))
 
-        sales_summay_offline_table = sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, ('批发业务', ''), start_date_week, end_date)
+        sales_summay_offline_table = sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, start_date_week, end_date)
         sales_summay_offline_table = To_DF(sales_summay_offline_table, sales_columns)
         sales_summay_offline_table[change_columns] = sales_summay_offline_table[change_columns].applymap(format_number)
 
@@ -383,11 +375,11 @@ if __name__ == '__main__':
         excel_saver.delete_crayola_files(file_root)
         #
         # 以下是销售详情 线上销售情况、线下销售情况
-        sales_online_detail_table = sales_detail(db_baidu, stock_out_detail, ('网店销售', '线下零售'), start_date_week, end_date, warehouse_name)
+        sales_online_detail_table = sales_detail(db_baidu, stock_out_detail, ('DPrqBGoj', '011', 'DPmqLkiE', 'DPSu3pLj', 'DPlL0X3A', 'DPNGPJBQ'), start_date_week, end_date, warehouse_name)
         sales_online_detail_table = To_DF(sales_online_detail_table, ['商家编码', '货品名称', '出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
         sales_online_detail_table = summary_all(pd.DataFrame(sales_online_detail_table), ['出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
 
-        sales_offline_detail_table = sales_detail(db_baidu, stock_out_detail, ('批发业务', ''), start_date_week, end_date, warehouse_name)
+        sales_offline_detail_table = sales_detail(db_baidu, stock_out_detail, ('010', ''), start_date_week, end_date, warehouse_name)
         sales_offline_detail_table = To_DF(sales_offline_detail_table, ['商家编码', '货品名称', '出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
         sales_offline_detail_table = summary_all(pd.DataFrame(sales_offline_detail_table), ['出库件数', '支付金额', '总成本(未税)', 'ERP库存件数'])
 
@@ -405,10 +397,10 @@ if __name__ == '__main__':
         # 贴入数据
         excel_saver.save_dataframe(sales_summay_table, sheet_name="Summary", start_row=2, start_col=1)  # 从第2行第1列开始
 
-        excel_saver.save_text(f'{start_date_week}-{end_date} 线上渠道销售情况', sheet_name="Summary", start_row=9, start_col=1)
-        excel_saver.fill_cell_red(sheet_name="Summary", row=9, col=1)
-        excel_saver.add_bold_border(sheet_name="Summary", start_row=9, start_col=1, end_row=9 + sales_summay_online_table.shape[0] + 1, end_col=6)
-        excel_saver.save_dataframe(sales_summay_online_table, sheet_name="Summary", start_row=10, start_col=1)  # 从第2行第6列开始
+        excel_saver.save_text(f'{start_date_week}-{end_date} 线上渠道销售情况', sheet_name="Summary", start_row=10, start_col=1)
+        excel_saver.fill_cell_red(sheet_name="Summary", row=10, col=1)
+        excel_saver.add_bold_border(sheet_name="Summary", start_row=10, start_col=1, end_row=10 + sales_summay_online_table.shape[0] + 1, end_col=6)
+        excel_saver.save_dataframe(sales_summay_online_table, sheet_name="Summary", start_row=11, start_col=1)  # 从第2行第6列开始
 
         excel_saver.save_text(f'{start_date_week}-{end_date} 线下渠道销售情况', sheet_name="Summary", start_row=22, start_col=1)
         excel_saver.fill_cell_red(sheet_name="Summary", row=22, col=1)
