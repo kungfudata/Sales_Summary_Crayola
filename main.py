@@ -79,12 +79,12 @@ def sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, start_date
     sql1 = f'''SELECT  
                 CASE 
                     WHEN NOT GROUPING(CASE 
-                        WHEN notd.cs_remark LIKE '%绘画乐%' THEN '线下-绘画乐' 
-                        ELSE '线下-功夫' 
+                    WHEN notd.cs_remark LIKE '%绘画乐%' THEN '线下-绘画乐' 
+                    ELSE '线下-置换/寄样' 
                     END) THEN
                         CASE 
-                            WHEN notd.cs_remark LIKE '%绘画乐%' THEN '线下-绘画乐' 
-                            ELSE '线下-功夫' 
+                    WHEN notd.cs_remark LIKE '%绘画乐%' THEN '线下-绘画乐' 
+                    ELSE '线下-置换/寄样' 
                         END
                     ELSE '汇总'
                 END AS group_name,
@@ -108,8 +108,10 @@ def sales_summay_offline(db_baidu, stock_out_detail, stock_out_table, start_date
             GROUP BY 
                 CASE 
                     WHEN notd.cs_remark LIKE '%绘画乐%' THEN '线下-绘画乐' 
-                    ELSE '线下-功夫' 
-                END WITH ROLLUP;
+                    ELSE '线下-置换/寄样' 
+                END WITH ROLLUP
+            ORDER BY 
+            SUM(d.detail_goods_count) ASC;
 '''
     print(sql1)
     db_baidu.execute_query(sql1)
